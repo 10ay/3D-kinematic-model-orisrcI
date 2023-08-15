@@ -8,6 +8,13 @@ from astropy.io import fits
 
 
 class SiSModel:
+    #Parameters to be Found
+    #self.r0_outer - Outer Radii of the Outflow
+    #self.r0_inner - Inner Radii of the Outflow
+    #self.v_radial
+    #self.v_phi0
+    #self.vz_0
+    #self.theta
     
     v_lsr = 5 #km/s
     
@@ -163,6 +170,9 @@ class SiSModel:
     
     def velocity_model_field(self, r, phi, zprime):
     
+        inner_radius = np.array(self.r_inner(zprime))
+        outer_radius = np.array(self.r_outer(zprime))
+        
         mask = (r > self.r_inner(zprime)) & (r < self.r_outer(zprime))
         vr = np.where(mask, self.v_radial * self.v_radial_dropoff(zprime), np.nan)
 
@@ -182,7 +192,9 @@ class SiSModel:
         vz = self.add_random_velocity_component(vz)
         
         
-        return vx, vy, vz
+        return vx, vy, vz, inner_radius, outer_radius
+    
+
 
     
     
@@ -325,6 +337,60 @@ class SiSModel:
                       
                       
     ###PV Plot
+    def radius_graph(self):
+        z_array = [-200, -150, -100, -50, 0, 50, 100, 150, 200]        
+        x, y = np.meshgrid(np.linspace(-400,400,501),
+                            np.linspace(-400, 400, 501))
+        inner_radius_errors =[]
+        inner_radius = []
+        outer_radius_errors =[]
+        outer_radius = []
+        for z in z_array:
+            r, phi, zprime = self.sky_to_outflow(x, y, z)
+            vx, vy, vz, inrad, outrad = self.velocity_model_field(r, phi, zprime)
+            inrad_std=np.std(inrad)
+            outrad_std = np.std(outrad)
+            inrad_mean=np.mean(inrad)
+            outrad_mean=np.mean(outrad)
+            inner_radius.append(inrad_mean)
+            inner_radius_errors.append(inrad_std)
+            outer_radius.append(outrad_mean)
+            outer_radius_errors.append(outrad_std)
+        fig, ax = plt.subplots(figsize=(10, 10))
+        ax.errorbar(z_array, inner_radius, yerr = inrad_std, fmt='o', label='R_in')
+        ax.errorbar(z_array, outer_radius, yerr = outrad_std, fmt='o', label='R_out')
+        ax.set_xlabel('z(au)')
+        ax.set_ylabel('Radius(au)')
+        ax.legend()
+
+
+
+
+    def velocity_graph(self):
+        z_array = [-200, -150, -100, -50, 0, 50, 100, 150, 200]        
+        x, y = np.meshgrid(np.linspace(-400,400,501),
+                            np.linspace(-400, 400, 501))
+        for z in z_array:
+            r, phi, zprime = self.sky_to_outflow(x, y, z)
+            vx, vy, vz, inrad, outrad = self.velocity_model_field(r, phi, zprime)
+            inrad_std=np.std(inrad)
+            outrad_std = np.std(outrad)
+            inrad_mean=np.mean(inrad)
+            outrad_mean=np.mean(outrad)
+            inner_radius.append(inrad_mean)
+            inner_radius_errors.append(inrad_std)
+            outer_radius.append(outrad_mean)
+            outer_radius_errors.append(outrad_std)
+        fig, ax = plt.subplots(figsize=(10, 10))
+        ax.errorbar(z_array, inner_radius, yerr = inrad_std, fmt='o', label='R_in')
+        ax.errorbar(z_array, outer_radius, yerr = outrad_std, fmt='o', label='R_out')
+        ax.set_xlabel('z(au)')
+        ax.set_ylabel('Radius(au)')
+        ax.legend()
+
+        
+        
+        
     def position_velocity(self):
         def pv(ax, z, vmin, vmax, nvbins):
             
@@ -338,8 +404,7 @@ class SiSModel:
             
             
             #zprime = np.abs(zprime)
-            
-            vx, vy, vz = self.velocity_model_field(r, phi, zprime)
+            vx, vy, vz, inner_radius, outer_radius = self.velocity_model_field(r, phi, zprime)
                 # 2D [y,x] array of velocity vectors in plane z
                 # we only care about vy, the velocity along the line of sight
                 
@@ -356,8 +421,8 @@ class SiSModel:
                 vl,binedges = np.histogram(v_y_adj[:, i], range=(vmin, vmax), bins=nvbins)
                 vlos.append(vl)                
             vlos = np.int16(vlos) 
-            hdu1 = fits.PrimaryHDU(vlos)
-            hdu1.writeto("sisfits"+str(np.int16(math.floor(z)))+".fits", overwrite=True)
+            #hdu1 = fits.PrimaryHDU(vlos)
+            #hdu1.writeto("sisfits"+str(np.int16(math.floor(z)))+".fits", overwrite=True)
             ax.imshow( vlos, origin='lower', aspect='auto', extent=(vmin, vmax, x[0,0], x[-1,-1]) )
             #bicone_coords, dust_coords, dust_velocity = self.dust(self.r0_outer, x, y, z, velocity_vectors, vmax)
             #xdgrid, ydgrid, zdgrid = self.plot_dust(bicone_coords, dust_coords, dust_velocity)
