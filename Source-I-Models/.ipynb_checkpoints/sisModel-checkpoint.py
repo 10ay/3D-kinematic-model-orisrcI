@@ -147,7 +147,8 @@ class SiSModel:
         return v_mutate
     
         
-
+    
+    '''
     # Outflow velocity change rates #
     def v_radial_dropoff(self, z):
         return 1.
@@ -158,7 +159,21 @@ class SiSModel:
     
     def v_z_dropoff(self, z):
         return 1.
+    '''
     
+    def v_radial_dropoff(self, r, z):
+        return 1
+    
+    
+    def v_phi_dropoff(self, r):
+        
+        factor = np.where(r > self.r_outer(0.0), 1 - ((r - self.r_outer(0.0)) / (self.r_outer(100.0) - self.r_outer(0.0))), 1.0)
+        dropoff = np.where(factor > 0.0, factor, 0.0)
+        return dropoff
+    
+    
+    def v_z_dropoff(self, z):
+        return 1.
                       
                       
     
@@ -174,11 +189,13 @@ class SiSModel:
         outer_radius = np.array(self.r_outer(zprime))
         
         mask = (r > self.r_inner(zprime)) & (r < self.r_outer(zprime))
-        vr = np.where(mask, self.v_radial * self.v_radial_dropoff(zprime), np.nan)
+        vr = np.where(mask, self.v_radial * self.v_radial_dropoff(r, zprime), np.nan)
 
         # Azimuthal rotation of vphi0 next to disk, drops linearly to 0 at height z_no_rotation #
-        vphi = np.where(np.abs(zprime) < self.z_no_rotation, self.v_phi0 * self.v_phi_dropoff(zprime), 0.)
+        vphi = np.where(np.abs(zprime) < self.z_no_rotation, self.v_phi0 * self.v_phi_dropoff(np.abs(zprime)), 0.)
+        print(vphi.mean())
         vphi = np.where(mask, vphi, np.nan)
+        
         
         # Flows away from disk at constant velocity vz0
         vz = np.where(zprime > 0., self.vz_0 * self.v_z_dropoff(zprime), -self.vz_0 * self.v_z_dropoff(zprime))
@@ -336,7 +353,52 @@ class SiSModel:
              '''
                       
                       
-    ###PV Plot
+    ###Parameters
+    def velocity_radial_expansion_graph(self):
+        z_array = [-200, -150, -100, -50, 0, 50, 100, 150, 200]        
+        x, y = np.meshgrid(np.linspace(-400,400,501),
+                            np.linspace(-400, 400, 501))
+        velocity_radial = []
+        item=1
+        for z in z_array:
+            x_prime, y_prime, z_prime = self.sky_to_prime(x, y, z)
+            r, phi, z_model = self.prime_to_outflow(x_prime, y_prime, z_prime)
+            vr = self.v_radial * self.v_radial_dropoff(r, z)
+            print(item, z, vr)
+            item+=1
+            velocity_radial.append(vr)
+        fig, ax = plt.subplots(figsize=(10, 10))
+        ax.scatter(z_array, velocity_radial)
+        ax.set_xlabel('z(au)')
+        ax.set_ylabel('Radial Expansion Velocity (km s^-1)')
+
+    
+    
+    
+    
+    def velocity_rotation_graph(self):
+        z_array = [-200, -150, -100, -50, 0, 50, 100, 150, 200]        
+        x, y = np.meshgrid(np.linspace(-400,400,501),
+                            np.linspace(-400, 400, 501))
+        velocity_rotational = []
+        for z in z_array:
+            if np.abs(z)<self.z_no_rotation:
+                velocity_rotational.append(self.v_phi0*self.v_phi_dropoff(np.abs(z)))
+            else:
+                velocity_rotational.append(0)
+
+        fig, ax = plt.subplots(figsize=(10, 10))
+    
+        ax.scatter(z_array, velocity_rotational)
+        ax.set_xlabel('z(au)')
+        ax.set_ylabel('Radial Expansion Velocity (km s^-1)')
+        
+        
+        
+
+        
+
+
     def radius_graph(self):
         z_array = [-200, -150, -100, -50, 0, 50, 100, 150, 200]        
         x, y = np.meshgrid(np.linspace(-400,400,501),
@@ -363,33 +425,9 @@ class SiSModel:
         ax.set_ylabel('Radius(au)')
         ax.legend()
 
-
-
-
-    def velocity_graph(self):
-        z_array = [-200, -150, -100, -50, 0, 50, 100, 150, 200]        
-        x, y = np.meshgrid(np.linspace(-400,400,501),
-                            np.linspace(-400, 400, 501))
-        for z in z_array:
-            r, phi, zprime = self.sky_to_outflow(x, y, z)
-            vx, vy, vz, inrad, outrad = self.velocity_model_field(r, phi, zprime)
-            inrad_std=np.std(inrad)
-            outrad_std = np.std(outrad)
-            inrad_mean=np.mean(inrad)
-            outrad_mean=np.mean(outrad)
-            inner_radius.append(inrad_mean)
-            inner_radius_errors.append(inrad_std)
-            outer_radius.append(outrad_mean)
-            outer_radius_errors.append(outrad_std)
-        fig, ax = plt.subplots(figsize=(10, 10))
-        ax.errorbar(z_array, inner_radius, yerr = inrad_std, fmt='o', label='R_in')
-        ax.errorbar(z_array, outer_radius, yerr = outrad_std, fmt='o', label='R_out')
-        ax.set_xlabel('z(au)')
-        ax.set_ylabel('Radius(au)')
-        ax.legend()
-
         
-        
+    ###PV Plot
+
         
     def position_velocity(self):
         def pv(ax, z, vmin, vmax, nvbins):
@@ -438,8 +476,8 @@ class SiSModel:
         ny = 3
         fig, ax = plt.subplots(nx, ny, sharex=True, sharey=True, figsize=(10, 10))
 
-        z = 0.
-        z_step = 80.
+        z = -200.
+        z_step = 50.
             # z starting value and step size in AU
 
         vmin = SiSModel.v_lsr - 20.
