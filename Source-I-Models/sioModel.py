@@ -187,12 +187,19 @@ class SiOModel:
     
             '''
 
+    '''
     def v_phi_dropoff(self, r, z):
         mask = (np.abs(z) < self.z_no_rotation)
         dropoff = np.where(mask, 1 - ((r - (self.r_outer(z) - self.r_inner(z)))/ (self.r_outer(z) - self.r_inner(z))), 1.0)
         return dropoff
+'''
 
-
+    
+    def v_phi_dropoff(self, r, z):
+        mask = (np.abs(z) < self.z_no_rotation)
+        dropoff = np.where(mask, 1 - ((r - (self.r_outer(z) - self.r_inner(z)))/ (self.r_outer(z) - self.r_inner(z))), 1.0)
+        return dropoff
+    
     
     def v_z_dropoff(self, z):
         return 1.
@@ -432,17 +439,19 @@ class SiOModel:
         rot = []
         vor = []
         for z in z_array:
-            r_in=self.r_inner(z)
-            rin.append(r_in)
+            if np.abs(z)<self.z_no_rotation:
+                r_in=self.r_inner(z)
+                r_out=self.r_outer(z)
+                specific_angular_momentum_inner_radius.append(self.v_phi0*self.v_phi_dropoff(r_in, z)*r_in)
+                specific_angular_momentum_outer_radius.append(self.v_phi0*self.v_phi_dropoff(r_out, z)*r_out)
+            else:
+                velocity_rotational_inner_radius.append(0)
+                velocity_rotational_outer_radius.append(0)
 
-            r_out=self.r_outer(z)
-            rot.append(r_out)
-            velocity_rotational_inner_radius = self.v_phi0*self.v_phi_dropoff(r_in, z)
-            vir.append(velocity_rotational_inner_radius)
-            specific_angular_momentum_inner_radius.append(velocity_rotational_inner_radius*r_in)
-            velocity_rotational_outer_radius = self.v_phi0*self.v_phi_dropoff(r_out, z)
-            vor.append(velocity_rotational_outer_radius)
-            specific_angular_momentum_outer_radius.append(velocity_rotational_outer_radius*r_out)
+                
+            
+            
+
             
         fig, ax = plt.subplots(figsize=(10, 10))
 
@@ -521,9 +530,9 @@ class SiOModel:
             for i in range(0,len(x)) :
                 vl,binedges = np.histogram(v_y_adj[:, i], range=(vmin, vmax), bins=nvbins)
                 vlos.append(vl)                
-            vlos = np.int16(vlos) 
-            hdu1 = fits.PrimaryHDU(vlos)
-            hdu1.writeto("siofits"+str(np.int16(math.floor(z)))+".fits", overwrite=True)
+            #vlos = np.int16(vlos) 
+            #hdu1 = fits.PrimaryHDU(vlos)
+            #hdu1.writeto("siofits"+str(np.int16(math.floor(z)))+".fits", overwrite=True)
             ax.imshow( vlos, origin='lower', aspect='auto', extent=(vmin, vmax, x[0,0], x[-1,-1]) )
             #bicone_coords, dust_coords, dust_velocity = self.dust(self.r0_outer, x, y, z, velocity_vectors, vmax)
             #xdgrid, ydgrid, zdgrid = self.plot_dust(bicone_coords, dust_coords, dust_velocity)
